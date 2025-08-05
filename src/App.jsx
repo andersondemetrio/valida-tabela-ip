@@ -50,7 +50,7 @@ function App() {
         )}
       </main>
       <footer>
-        <p>Desenvolvido com React + Vite</p>
+        <p>Desenvolvido Anderson, Rafa e Renan</p>
       </footer>
     </div>
   );
