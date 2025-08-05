@@ -1,0 +1,24 @@
+.dropzone {
+  border: 2px dashed var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.dropzone p {
+  margin: 0;
+  font-size: 1.1em;
+  color: var(--text-color-light);
+}
+
+.dropzone.active {
+  border-color: var(--primary-color);
+  background-color: var(--primary-color-light);
+}
+
+.dropzone-error {
+  color: var(--danger-color);
+  margin-top: 10px;
+}

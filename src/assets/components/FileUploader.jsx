@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import './FileUploader.css'; // Importa o arquivo de estilos que criamos
 
 const FileUploader = ({ onValidationComplete, setIsLoading, setValidationResult }) => {
   const [error, setError] = useState(null);
@@ -119,10 +120,14 @@ const FileUploader = ({ onValidationComplete, setIsLoading, setValidationResult 
   });
 
   return (
-    <div {...getRootProps()} style={{ border: `2px dashed ${isDragActive ? 'rgb(22, 163, 74)' : '#cccccc'}`, borderRadius: '10px', padding: '40px 20px', textAlign: 'center', cursor: 'pointer', transition: 'border .24s ease-in-out' }}>
+    <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''}`}>
       <input {...getInputProps()} />
-      {isDragActive ? ( <p>Solte a tabela de frete aqui...</p> ) : ( <p>Arraste e solte a tabela aqui, ou clique para selecionar</p> )}
-       {error && <p style={{ color: 'red' }}>{error}</p>}
+      {isDragActive ? (
+        <p>Solte a tabela de frete aqui...</p>
+      ) : (
+        <p>Arraste e solte a tabela aqui, ou clique para selecionar</p>
+      )}
+      {error && <p className="dropzone-error">{error}</p>}
     </div>
   );
 };
