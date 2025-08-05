@@ -4,11 +4,16 @@ import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
-const FileUploader = ({ onValidationComplete }) => {
+// 1. Receber as novas props do App.jsx
+const FileUploader = ({ onValidationComplete, setIsLoading, setValidationResult }) => {
   const [error, setError] = useState(null);
 
   const processFile = (file) => {
+    // 2. Limpar o relatório antigo e INICIAR a animação
     setError(null);
+    setValidationResult(null); // Garante que o relatório antigo suma
+    setIsLoading(true);
+
     const reader = new FileReader();
 
     reader.onload = (e) => {
@@ -17,34 +22,25 @@ const FileUploader = ({ onValidationComplete }) => {
         let jsonData = null;
 
         if (file.name.endsWith('.csv')) {
-          // Lógica para CSV continua a mesma
           const parsed = Papa.parse(data, { header: true, skipEmptyLines: true });
           jsonData = parsed.data;
         } else {
-          // --- LÓGICA CORRIGIDA E MELHORADA PARA EXCEL ---
           const workbook = XLSX.read(data, { type: 'binary' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-
-          // Converte a planilha para um array de arrays (linhas e colunas)
-          // Isso nos dá mais controle do que a conversão direta para JSON
           const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
 
           if (!rows || rows.length === 0) {
             throw new Error("A planilha parece estar vazia.");
           }
-
-          // Procura dinamicamente pela linha do cabeçalho (procura nas 10 primeiras linhas)
+          
           let headerIndex = -1;
           let headers = [];
           for (let i = 0; i < Math.min(rows.length, 10); i++) {
-              // Converte a linha para strings e maiúsculas para uma busca robusta
               const potentialHeader = (rows[i] || []).map(h => String(h || '').toUpperCase().trim());
-              
-              // Verifica se a linha contém colunas essenciais
               if (potentialHeader.includes('CEPI') && potentialHeader.includes('CEPF') && (potentialHeader.includes('PRAZO(DIAS ÚTEIS)') || potentialHeader.includes('PRAZO'))) {
                   headerIndex = i;
-                  headers = rows[i]; // Usa os nomes originais
+                  headers = rows[i];
                   break;
               }
           }
@@ -53,21 +49,19 @@ const FileUploader = ({ onValidationComplete }) => {
             throw new Error("Cabeçalho não encontrado. Verifique se a planilha contém as colunas 'CEPI', 'CEPF' e 'PRAZO'.");
           }
           
-          // As linhas de dados são todas as que vêm depois do cabeçalho
           const dataRows = rows.slice(headerIndex + 1);
 
-          // Constrói o JSON manualmente usando os cabeçalhos encontrados
           jsonData = dataRows
             .map(row => {
               const obj = {};
               headers.forEach((header, index) => {
-                if (header) { // Ignora colunas sem nome de cabeçalho
+                if (header) {
                   obj[header] = row[index];
                 }
               });
               return obj;
             })
-            .filter(row => Object.values(row).some(cell => cell !== null && cell !== '')); // Remove linhas totalmente vazias
+            .filter(row => Object.values(row).some(cell => cell !== null && cell !== ''));
         }
         
         if (!jsonData || jsonData.length === 0) {
@@ -80,12 +74,16 @@ const FileUploader = ({ onValidationComplete }) => {
         console.error(err);
         setError(`Erro ao processar o arquivo: ${err.message}`);
         onValidationComplete(null, file.name);
+      } finally {
+        // 3. PARAR a animação no final, com sucesso ou erro
+        setIsLoading(false);
       }
     };
 
     reader.onerror = () => {
         setError('Falha ao ler o arquivo.');
         onValidationComplete(null, file.name);
+        setIsLoading(false); // 4. Também parar a animação em caso de erro
     };
 
     reader.readAsBinaryString(file);
@@ -95,7 +93,7 @@ const FileUploader = ({ onValidationComplete }) => {
     if (acceptedFiles.length > 0) {
       processFile(acceptedFiles[0]);
     }
-  }, []);
+  }, [processFile]); // Adicionado 'processFile' ao array de dependências do useCallback
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
