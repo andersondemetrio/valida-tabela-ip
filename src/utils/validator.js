@@ -1,11 +1,10 @@
 // src/utils/validator.js
 
-// Colunas obrigatórias de abrangência
 const REQUIRED_COVERAGE_COLS = ['CEPI', 'CEPF', 'UF', 'CIDADE', 'PRAZO'];
 
-// Função para normalizar nomes de colunas (remove acentos, espaços e deixa em maiúsculo)
 const normalizeHeader = (header) => {
   if (!header) return '';
+  // Converte para maiúsculo, remove acentos e caracteres especiais
   return header
     .toString()
     .normalize('NFD')
@@ -21,11 +20,12 @@ export const validateFreightTable = (data) => {
       errors: ['O arquivo está vazio ou não pôde ser lido.'],
       foundCols: [],
       missingCols: REQUIRED_COVERAGE_COLS,
+      rawHeaders: []
     };
   }
 
-  const headers = Object.keys(data[0]);
-  const normalizedHeaders = headers.map(normalizeHeader);
+  const rawHeaders = Object.keys(data[0]);
+  const normalizedHeaders = rawHeaders.map(normalizeHeader);
 
   // --- 1. Validação de Colunas de Abrangência ---
   const foundCols = [];
@@ -36,7 +36,8 @@ export const validateFreightTable = (data) => {
       'CEPI': ['CEPI', 'CEPINICIAL'],
       'CEPF': ['CEPF', 'CEPFINAL'],
       'UF': ['UF', 'UFDESTINO'],
-      'CIDADE': ['CIDADE', 'LOCALIDADE'],
+      // AJUSTE 1: Adicionado LOCALIDADEDESTINO como variação válida para CIDADE
+      'CIDADE': ['CIDADE', 'LOCALIDADE', 'LOCALIDADEDESTINO'],
       'PRAZO': ['PRAZO', 'PRAZODIAS', 'PRAZODIASUTEIS', 'PRAZOENTREGA']
     };
 
@@ -48,35 +49,42 @@ export const validateFreightTable = (data) => {
     }
   });
 
-  // --- 2. Validação de Precificação ---
+  // --- 2. Validação de Precificação (com lógica melhorada) ---
   const errors = [];
   let hasPricing = false;
 
-  // Verifica se é matricial (procura por colunas que são apenas números, representando pesos)
-  const weightCols = headers.filter(h => !isNaN(parseFloat(h)) && isFinite(h));
-  if (weightCols.length > 5) { // Heurística: mais de 5 colunas numéricas é provavelmente uma matriz de peso
+  // Verificação 1: Formato Matricial (ex: Jadlog, Azul Cargo)
+  const weightCols = rawHeaders.filter(h => !isNaN(parseFloat(h)) && isFinite(h));
+  if (weightCols.length > 5) {
     hasPricing = true;
-    foundCols.push('Pesos (matricial)');
+    foundCols.push('Pesos (formato matricial)');
   } else {
-    // Verifica por colunas de preço linearizadas
-    const hasLinearPricing = ['VALORFRETE', 'FRETEVALOR', 'PRECO'].some(p => normalizedHeaders.includes(p));
-    if (hasLinearPricing) {
-        hasPricing = true;
-        foundCols.push('Valor do Frete');
+    // AJUSTE 2: Adicionada verificação para formato Linear com faixas (ex: Rodonaves)
+    const hasLinearRangeFormat = normalizedHeaders.includes('PESOINICIAL') &&
+                                 normalizedHeaders.includes('PESOFINAL') &&
+                                 (normalizedHeaders.includes('FRETE') || normalizedHeaders.includes('FRETERS')); // "Frete (R$)" vira "FRETERS"
+
+    // Verificação 3: Formato Linear simples
+    const hasSimpleLinearFormat = ['VALORFRETE', 'FRETEVALOR', 'PRECO'].some(p => normalizedHeaders.includes(p));
+
+    if (hasLinearRangeFormat) {
+      hasPricing = true;
+      foundCols.push('Frete (formato linear com faixa de peso)');
+    } else if (hasSimpleLinearFormat) {
+      hasPricing = true;
+      foundCols.push('Valor do Frete');
     }
   }
-
+  
   if (!hasPricing) {
-      errors.push('Não foi encontrada uma estrutura de precificação válida (nem matricial, nem colunas como "valor_frete").');
+      errors.push('Não foi encontrada uma estrutura de precificação válida (nem matricial, nem linear).');
   }
 
   // --- 3. Diagnóstico Final ---
   let diagnosis = '✅ Apto para abertura de chamado';
-
   if (missingCols.length > 0 || errors.length > 0) {
     diagnosis = '⚠️ Requer ajustes';
   }
-
   if (missingCols.length === REQUIRED_COVERAGE_COLS.length || !hasPricing) {
     diagnosis = '❌ Incompleto – não é possível seguir';
   }
@@ -84,7 +92,8 @@ export const validateFreightTable = (data) => {
   return {
     diagnosis,
     errors,
-    foundCols: [...new Set(foundCols)], // Remove duplicados
+    foundCols: [...new Set(foundCols)],
     missingCols,
+    rawHeaders: rawHeaders,
   };
 };
