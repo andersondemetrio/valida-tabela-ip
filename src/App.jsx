@@ -29,7 +29,7 @@ function App() {
   return (
     <div className="container">
       <header>
-        <h1>Validador de Tabelas de Frete</h1>
+        <h1>Validador de Tabelas de Frete Modelo Intelipost</h1>
         <p>Faça o upload de um arquivo (Excel ou CSV) para analisar se ele atende aos requisitos mínimos de implantação.</p>
       </header>
       <main>
