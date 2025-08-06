@@ -1,4 +1,82 @@
-/* Adicionar ao final de ValidationReport.css */
+/* src/components/ValidationReport.css */
+
+.report-card {
+  margin-top: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.report-header {
+  padding: 1rem 1.5rem;
+  background-color: var(--light-gray);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.report-header h3 {
+  margin: 0;
+  font-size: 1.25em;
+}
+
+.report-body {
+  padding: 1.5rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.status-badge.success { background-color: var(--success-color); }
+.status-badge.warning { background-color: var(--warning-color); color: var(--text-color); }
+.status-badge.danger { background-color: var(--danger-color); }
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.detail-block h4 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--text-color-light);
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-block p, .detail-block ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+  font-size: 1.1em;
+}
+
+.detail-block ul li {
+  padding: 0.2rem 0;
+}
+
+/* --- ESTA É A PARTE QUE CRIA OS ÍCONES --- */
+.found-cols::before {
+  content: '✓'; /* Ícone de check */
+  color: var(--success-color);
+  margin-right: 8px;
+  font-weight: bold;
+}
+
+.missing-cols::before {
+  content: '✗'; /* Ícone de X */
+  color: var(--danger-color);
+  margin-right: 8px;
+  font-weight: bold;
+}
+/* --- FIM DA PARTE DOS ÍCONES --- */
+
 .justification-block {
   margin-top: 1.5rem;
   padding: 1rem;
@@ -15,4 +93,32 @@
 .justification-block p {
   margin: 0;
   font-size: 1.05em;
+}
+
+.debug-details {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.5rem;
+}
+
+.debug-details summary {
+  cursor: pointer;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.debug-details pre {
+  margin-top: 1rem;
+  background-color: var(--light-gray);
+  border: 1px solid var(--border-color);
+  padding: 1rem;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.9em;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
