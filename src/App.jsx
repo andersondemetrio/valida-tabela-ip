@@ -2,27 +2,27 @@
 import React, { useState } from 'react';
 import FileUploader from './assets/components/FileUploader.jsx';
 import ValidationReport from './assets/components/ValidationReport.jsx';
-import Loader from './assets/components/Loader.jsx'; // 1. Importar o Loader
-import { validateFreightTable } from './utils/validator.js';
+import Loader from './assets/components/Loader.jsx';
+import { validateWorkbook } from './utils/validator.js'; // Mudou para validateWorkbook
 import './App.css';
 
 function App() {
   const [validationResult, setValidationResult] = useState(null);
   const [currentFile, setCurrentFile] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // 2. Adicionar estado de loading
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleValidation = (data, fileName) => {
+  const handleValidation = (sheetsData, fileName, errorMessage = null) => {
     setCurrentFile(fileName);
-    if (!data) {
+    if (errorMessage) {
+        // Objeto de erro agora tem a estrutura correta
         setValidationResult({
             diagnosis: '❌ Incompleto – não é possível seguir',
-            errors: [`Não foi possível ler os dados do arquivo "${fileName}". Verifique se o formato é válido ou não está corrompido.`],
-            foundCols: [],
-            missingCols: [],
+            justification: [errorMessage],
+            sheetReports: [],
         });
         return;
     }
-    const report = validateFreightTable(data);
+    const report = validateWorkbook(sheetsData); // Chama a nova função
     setValidationResult(report);
   };
 
@@ -33,7 +33,6 @@ function App() {
         <p>Faça o upload de um arquivo (Excel ou CSV) para analisar se ele atende aos requisitos mínimos de implantação.</p>
       </header>
       <main>
-        {/* 3. Lógica para exibir o Loader ou o conteúdo principal */}
         {isLoading ? (
           <Loader />
         ) : (

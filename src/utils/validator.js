@@ -1,23 +1,24 @@
 // src/utils/validator.js
 
-// ... (as funções normalizeHeader, validateCoverage, e validatePricing continuam iguais às da versão anterior)
+const COLUMN_VARIANTS = {
+    CEPI: ['CEPI', 'CEPINICIAL', 'CEPINI'],
+    CEPF: ['CEPF', 'CEPFINAL', 'CEPFIM'],
+    UF: ['UF', 'UFDESTINO'],
+    CIDADE: ['CIDADE', 'LOCALIDADE', 'LOCALIDADEDESTINO', 'MUNICIPIO'],
+    PRAZO: ['PRAZO', 'PRAZODIAS', 'PRAZODIASUTEIS', 'PRAZOENTREGA', 'PREVISAODEENTREGA'],
+};
+
 const normalizeHeader = (header) => {
   if (!header) return '';
   return header.toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 };
+
 function validateCoverage(normalizedHeaders) {
-    const REQUIRED_COLS = ['CEPI', 'CEPF', 'UF', 'CIDADE', 'PRAZO'];
     const found = [];
     const missing = [];
-    REQUIRED_COLS.forEach(reqCol => {
-        const variants = {
-            'CEPI': ['CEPI', 'CEPINICIAL'],
-            'CEPF': ['CEPF', 'CEPFINAL'],
-            'UF': ['UF', 'UFDESTINO'],
-            'CIDADE': ['CIDADE', 'LOCALIDADE', 'LOCALIDADEDESTINO', 'MUNICIPIO'],
-            'PRAZO': ['PRAZO', 'PRAZODIAS', 'PRAZODIASUTEIS', 'PRAZOENTREGA', 'PREVISAODEENTREGA']
-        };
-        if (variants[reqCol].some(variant => normalizedHeaders.includes(variant))) {
+    Object.keys(COLUMN_VARIANTS).forEach(reqCol => {
+        const variants = COLUMN_VARIANTS[reqCol];
+        if (variants.some(variant => normalizedHeaders.includes(variant))) {
             found.push(reqCol);
         } else {
             missing.push(reqCol);
@@ -28,74 +29,78 @@ function validateCoverage(normalizedHeaders) {
     }
     return { found, missing };
 }
+
 function validatePricing(normalizedHeaders, rawHeaders) {
-    const weightCols = rawHeaders.filter(h => !isNaN(parseFloat(h)) && isFinite(h));
-    if (weightCols.length > 5) {
+    if (rawHeaders.filter(h => !isNaN(parseFloat(h)) && isFinite(h)).length > 5) {
         return { found: true, format: 'Precificação por faixa de peso (formato matricial)' };
     }
-    const hasLinearRangeFormat = normalizedHeaders.includes('PESOINICIAL') && normalizedHeaders.includes('PESOFINAL') && (normalizedHeaders.includes('FRETE') || normalizedHeaders.includes('FRETERS'));
-    if (hasLinearRangeFormat) {
+    if (rawHeaders.filter(h => h.toLowerCase().includes('kg')).length >= 3 && normalizedHeaders.includes('FRETEMINIMO')) {
+        return { found: true, format: 'Precificação por faixa de peso (formato texto)' };
+    }
+    if (normalizedHeaders.includes('PESOINICIAL') && normalizedHeaders.includes('PESOFINAL') && (normalizedHeaders.includes('FRETE') || normalizedHeaders.includes('FRETERS'))) {
         return { found: true, format: 'Precificação por faixa de peso (formato linear)' };
     }
-    const hasMinPlusKg = (normalizedHeaders.includes('FRETEMINIMO') || normalizedHeaders.includes('FRETEMINIMORS')) && normalizedHeaders.includes('EXCEDENTEPORKG');
-    if (hasMinPlusKg) {
+    if ((normalizedHeaders.includes('FRETEMINIMO') || normalizedHeaders.includes('FRETEMINIMORS')) && normalizedHeaders.includes('EXCEDENTEPORKG')) {
         return { found: true, format: 'Precificação por Frete Mínimo + Kg Adicional' };
     }
-    const hasSimpleLinearFormat = ['VALORFRETE', 'FRETEVALOR', 'PRECO'].some(p => normalizedHeaders.includes(p));
-    if (hasSimpleLinearFormat) {
+    if (['VALORFRETE', 'FRETEVALOR', 'PRECO'].some(p => normalizedHeaders.includes(p))) {
         return { found: true, format: 'Precificação por valor de frete (formato linear simples)' };
     }
     return { found: false, format: null };
 }
 
-// --- LÓGICA DE DIAGNÓSTICO CORRIGIDA ---
-export const validateFreightTable = (data) => {
-    if (!data || data.length === 0) {
-        // ... (código de erro de arquivo vazio)
-        return {
-            diagnosis: '❌ Incompleto – não é possível seguir',
-            coverage: { found: [], missing: ['CEPI', 'CEPF', 'UF', 'CIDADE', 'PRAZO'] },
-            pricing: { found: false, format: null },
-            justification: ['O arquivo está vazio ou não pôde ser lido.'],
-            rawHeaders: []
-        };
+// Função principal agora analisa um objeto com múltiplas abas
+export const validateWorkbook = (sheetsData) => {
+    const sheetReports = [];
+    let overallCoverageFound = false;
+    let overallPricingFound = false;
+
+    for (const sheetName in sheetsData) {
+        const data = sheetsData[sheetName];
+        if (!data || data.length === 0) continue;
+
+        const rawHeaders = Object.keys(data[0]);
+        const normalizedHeaders = rawHeaders.map(normalizeHeader);
+        
+        const coverageAnalysis = validateCoverage(normalizedHeaders);
+        const pricingAnalysis = validatePricing(normalizedHeaders, rawHeaders);
+
+        // Só adiciona ao relatório se encontrar algo de útil na aba
+        if (coverageAnalysis.found.length > 0 || pricingAnalysis.found) {
+            sheetReports.push({
+                sheetName,
+                coverage: coverageAnalysis,
+                pricing: pricingAnalysis,
+            });
+            if (coverageAnalysis.missing.length === 0) overallCoverageFound = true;
+            if (pricingAnalysis.found) overallPricingFound = true;
+        }
     }
 
-    const rawHeaders = Object.keys(data[0]);
-    const normalizedHeaders = rawHeaders.map(normalizeHeader);
-
-    const coverageAnalysis = validateCoverage(normalizedHeaders);
-    const pricingAnalysis = validatePricing(normalizedHeaders, rawHeaders);
-
-    const justification = [];
+    // Monta o diagnóstico final consolidado
     let diagnosis = '';
+    const justification = [];
 
-    // Estrutura de decisão reescrita para ser mais clara e sem bugs
-    if (coverageAnalysis.missing.length === 0 && pricingAnalysis.found) {
-        // Cenário 1: Tudo OK
+    if (sheetReports.length === 0) {
+        diagnosis = '❌ Incompleto – não é possível seguir';
+        justification.push("Nenhuma aba com colunas de abrangência ou precificação reconhecidas foi encontrada.");
+    } else if (overallCoverageFound && overallPricingFound) {
         diagnosis = '✅ Apto para abertura de chamado';
-
-    } else if (pricingAnalysis.found && coverageAnalysis.missing.length > 0) {
-        // Cenário 2: Preço OK, mas falta Abrangência
+        justification.push("O arquivo contém abas com abrangência completa e precificação válida.");
+    } else if (!overallCoverageFound && overallPricingFound) {
         diagnosis = '⚠️ Requer ajustes';
-        justification.push(`A precificação foi encontrada, mas faltam as seguintes colunas de abrangência: ${coverageAnalysis.missing.join(', ')}.`);
-
-    } else if (!pricingAnalysis.found && coverageAnalysis.missing.length === 0) {
-        // Cenário 3: Abrangência OK, mas falta Preço
+        justification.push("Encontramos precificação, mas nenhuma aba contém todas as colunas de abrangência necessárias.");
+    } else if (overallCoverageFound && !overallPricingFound) {
         diagnosis = '❌ Incompleto – não é possível seguir';
-        justification.push("A abrangência foi encontrada, mas a tabela de precificação está faltando ou seu formato não foi reconhecido.");
-
-    } else { // !pricingAnalysis.found && coverageAnalysis.missing.length > 0
-        // Cenário 4: Faltam os dois
+        justification.push("Encontramos abrangência completa, mas nenhuma aba contém uma tabela de precificação válida.");
+    } else {
         diagnosis = '❌ Incompleto – não é possível seguir';
-        justification.push(`Faltam colunas de abrangência (${coverageAnalysis.missing.join(', ')}) e a tabela de precificação.`);
+        justification.push("As abas contêm informações parciais. Verifique os detalhes abaixo para ver o que falta.");
     }
-    
+
     return {
         diagnosis,
-        coverage: coverageAnalysis,
-        pricing: pricingAnalysis,
         justification,
-        rawHeaders
+        sheetReports, // Retorna os relatórios detalhados por aba
     };
 };

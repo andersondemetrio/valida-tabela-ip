@@ -1,21 +1,13 @@
-// src/components/ValidationReport.jsx
+// src/assets/components/ValidationReport.jsx
 import React from 'react';
 import './ValidationReport.css';
 
 const ValidationReport = ({ report, fileName }) => {
-  // Verificação de segurança simples
   if (!report) {
     return null;
   }
 
-  // Desestruturação direta, confiando na estrutura enviada pelo validator.js
-  const {
-    diagnosis,
-    coverage,
-    pricing,
-    justification,
-    rawHeaders
-  } = report;
+  const { diagnosis, justification, sheetReports } = report;
 
   const getStatusInfo = () => {
     if (diagnosis.includes('✅')) return { text: 'Apto para abertura de chamado', className: 'success' };
@@ -29,7 +21,7 @@ const ValidationReport = ({ report, fileName }) => {
   return (
     <div className="report-card">
       <div className="report-header">
-        <h3>Diagnóstico da Tabela</h3>
+        <h3>Diagnóstico Geral do Arquivo</h3>
         <p style={{ margin: 0, color: 'var(--text-color-light)' }}>
           Arquivo: {fileName}
         </p>
@@ -40,44 +32,42 @@ const ValidationReport = ({ report, fileName }) => {
           {statusInfo.text}
         </div>
 
-        <div className="details-grid">
-          {/* Bloco de Análise de Abrangência */}
-          <div className="detail-block">
-            <h4>Análise de Abrangência</h4>
-            <ul>
-              {coverage.found.map(col => <li className="found-cols" key={col}>{col}</li>)}
-              {coverage.missing.map(col => <li className="missing-cols" key={col}>{col}</li>)}
-            </ul>
-          </div>
-
-          {/* Bloco de Análise de Precificação */}
-          <div className="detail-block">
-            <h4>Análise de Precificação</h4>
-            <ul>
-              {pricing.found ? (
-                <li className="found-cols">{pricing.format}</li>
-              ) : (
-                <li className="missing-cols">Nenhum formato de preço reconhecido.</li>
-              )}
-            </ul>
-          </div>
-        </div>
-
-        {/* Bloco de Justificativa */}
+        {/* Bloco de Justificativa Consolidada */}
         {justification && justification.length > 0 && (
           <div className="justification-block">
-            <h4>Justificativa do Diagnóstico</h4>
+            <h4>Resumo da Análise</h4>
             {justification.map((msg, index) => <p key={index}>{msg}</p>)}
           </div>
         )}
 
-        {/* Bloco de Debug */}
-        {rawHeaders && rawHeaders.length > 0 && (
-          <div className="debug-details">
-            <details>
-              <summary>Exibir todas as colunas lidas pelo programa (Debug)</summary>
-              <pre>{JSON.stringify(rawHeaders, null, 2)}</pre>
-            </details>
+        {/* Detalhes por Aba */}
+        {sheetReports && sheetReports.length > 0 && (
+          <div className="sheets-container">
+            <h4 className="sheets-title">Detalhes por Aba da Planilha</h4>
+            {sheetReports.map((sheetReport, index) => (
+              <div key={index} className="sheet-detail-card">
+                <h5>Aba: "{sheetReport.sheetName}"</h5>
+                <div className="details-grid">
+                  <div className="detail-block">
+                    <h6>Análise de Abrangência</h6>
+                    <ul>
+                      {sheetReport.coverage.found.map(col => <li className="found-cols" key={col}>{col}</li>)}
+                      {sheetReport.coverage.missing.map(col => <li className="missing-cols" key={col}>{col}</li>)}
+                    </ul>
+                  </div>
+                  <div className="detail-block">
+                    <h6>Análise de Precificação</h6>
+                    <ul>
+                      {sheetReport.pricing.found ? (
+                        <li className="found-cols">{sheetReport.pricing.format}</li>
+                      ) : (
+                        <li className="missing-cols">Nenhum formato de preço reconhecido.</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
